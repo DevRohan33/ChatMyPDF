@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { usePDF } from "@/contexts/PDFContext";
 import { useChat } from "@/contexts/ChatContext";
-import { FileText, Trash2 } from "lucide-react";
+import { FileText, Trash2, Scissors } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const PDFList: React.FC = () => {
   const { pdfs, deletePDF, selectPDF } = usePDF();
@@ -17,6 +18,10 @@ const PDFList: React.FC = () => {
       selectPDF(pdf);
       startSession(pdfId);
     }
+  };
+
+  const handleSplitPDF = (pdfName: string, url: string) => {
+    window.open(`https://www.ilovepdf.com/split_pdf?utm_source=chatmypdf&file=${encodeURIComponent(pdfName)}`, '_blank');
   };
 
   if (pdfs.length === 0) {
@@ -63,6 +68,23 @@ const PDFList: React.FC = () => {
                 >
                   Chat
                 </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-gray-500 border-gray-200 hover:bg-gray-50"
+                        onClick={() => handleSplitPDF(pdf.name, 'https://www.ilovepdf.com/split_pdf')}
+                      >
+                        <Scissors className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Split PDF Pages</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <Button
                   size="sm"
                   variant="outline"
@@ -81,3 +103,4 @@ const PDFList: React.FC = () => {
 };
 
 export default PDFList;
+
