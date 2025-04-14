@@ -70,7 +70,7 @@ const ChatInterface: React.FC = () => {
               </Button>
               <CardTitle className="text-lg">{selectedPDF.name}</CardTitle>
             </div>
-            <CreditDisplay />
+            {/* <CreditDisplay /> */}
           </div>
         </CardHeader>
         <CardContent className="flex-1 overflow-auto p-4">

@@ -1,5 +1,12 @@
-
-import React, { createContext, useState, useContext, useEffect } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+} from "firebase/auth";
+import { doc, setDoc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/firebase/config";
 import { toast } from "sonner";
 
 interface User {
@@ -14,8 +21,8 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-  updateCredits: (newCredits: number) => void;
+  logout: () => Promise<void>;
+  updateCredits: (newCredits: number) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,88 +39,96 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check if user is already logged in
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (error) {
-        console.error("Failed to parse stored user:", error);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const newUser: User = {
+            id: firebaseUser.uid,
+            email: firebaseUser.email || "",
+            credits: userData.credits,
+          };
+          setUser(newUser);
+          localStorage.setItem("user", JSON.stringify(newUser));
+        }
+      } else {
+        setUser(null);
         localStorage.removeItem("user");
       }
-    }
-    setIsLoading(false);
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  // Mock login function (would be replaced with real authentication)
-  const login = async (email: string, password: string) => {
-    setIsLoading(true);
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock successful login
-      if (email && password) {
-        const user: User = {
-          id: "user-" + Math.random().toString(36).substr(2, 9),
-          email,
-          credits: 10, // Free credits for new users
-        };
-        setUser(user);
-        localStorage.setItem("user", JSON.stringify(user));
-        toast.success("Logged in successfully!");
-      } else {
-        throw new Error("Invalid credentials");
-      }
-    } catch (error) {
-      toast.error("Login failed: " + (error instanceof Error ? error.message : String(error)));
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Mock signup function
   const signup = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock successful signup
-      if (email && password) {
-        const user: User = {
-          id: "user-" + Math.random().toString(36).substr(2, 9),
-          email,
-          credits: 10, // Free credits for new users
-        };
-        setUser(user);
-        localStorage.setItem("user", JSON.stringify(user));
-        toast.success("Account created successfully!");
-      } else {
-        throw new Error("Invalid credentials");
-      }
-    } catch (error) {
-      toast.error("Signup failed: " + (error instanceof Error ? error.message : String(error)));
-      throw error;
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+
+      const newUser: User = {
+        id: firebaseUser.uid,
+        email: firebaseUser.email || "",
+        credits: 10,
+      };
+
+      await setDoc(doc(db, "users", firebaseUser.uid), newUser);
+      setUser(newUser);
+      localStorage.setItem("user", JSON.stringify(newUser));
+
+      toast.success("Account created successfully!");
+    } catch (error: any) {
+      toast.error(error.message);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem("user");
-    toast.success("Logged out successfully!");
+  const login = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+
+      const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const newUser: User = {
+          id: firebaseUser.uid,
+          email: firebaseUser.email || "",
+          credits: userData.credits,
+        };
+        setUser(newUser);
+        localStorage.setItem("user", JSON.stringify(newUser));
+      }
+
+      toast.success("Logged in successfully!");
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const updateCredits = (newCredits: number) => {
-    if (user) {
-      const updatedUser = { ...user, credits: newCredits };
-      setUser(updatedUser);
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-    }
+  const logout = async () => {
+    await signOut(auth);
+    setUser(null);
+    localStorage.removeItem("user");
+    toast.success("Logged out!");
+  };
+
+  const updateCredits = async (newCredits: number) => {
+    if (!user) return;
+    await setDoc(doc(db, "users", user.id), {
+      email: user.email,
+      credits: newCredits,
+    });
+    const updatedUser = { ...user, credits: newCredits };
+    setUser(updatedUser);
+    localStorage.setItem("user", JSON.stringify(updatedUser));
   };
 
   return (
