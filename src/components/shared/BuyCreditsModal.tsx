@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +10,6 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
 
 interface CreditPack {
   id: string;
@@ -48,27 +46,24 @@ const creditPacks: CreditPack[] = [
 
 const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({ open, onOpenChange }) => {
   const [selectedPack, setSelectedPack] = useState<CreditPack | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const { user, updateCredits } = useAuth();
+  const { user } = useAuth();
 
-  const handleBuy = async () => {
-    if (!selectedPack || !user) return;
+  const handleBuy = () => {
+    if (!selectedPack) return;
 
-    setIsProcessing(true);
-    try {
-      // Simulate payment processing
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      
-      // Update user credits
-      const newCredits = user.credits + selectedPack.credits;
-      updateCredits(newCredits);
-      
-      toast.success(`Successfully purchased ${selectedPack.credits} credits!`);
+    const paymentLinks: Record<string, string> = {
+      mini: "https://rzp.io/rzp/lZiF4LB",
+      standard: "https://rzp.io/rzp/rZnmNA9n",
+      pro: "https://rzp.io/rzp/Ov9mNp2",
+    };
+
+    const paymentUrl = paymentLinks[selectedPack.id];
+    if (paymentUrl) {
+      window.open(paymentUrl, "_blank");
+      toast.success(`Redirecting to payment for ${selectedPack.credits} credits`);
       onOpenChange(false);
-    } catch (error) {
-      toast.error("Payment failed: " + (error instanceof Error ? error.message : String(error)));
-    } finally {
-      setIsProcessing(false);
+    } else {
+      toast.error("Invalid pack selected.");
     }
   };
 
@@ -81,7 +76,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({ open, onOpenChange })
             Purchase credits to continue chatting with your documents.
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="grid grid-cols-3 gap-4 py-4">
           {creditPacks.map((pack) => (
             <div
@@ -103,17 +98,10 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({ open, onOpenChange })
         <DialogFooter>
           <Button
             onClick={handleBuy}
-            disabled={!selectedPack || isProcessing}
+            disabled={!selectedPack}
             className="w-full bg-app-blue hover:bg-app-blue/90"
           >
-            {isProcessing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>Buy {selectedPack?.credits} credits</>
-            )}
+            Buy {selectedPack?.credits || ""} credits
           </Button>
         </DialogFooter>
       </DialogContent>
